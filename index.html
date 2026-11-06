@@ -10,18 +10,21 @@
     
     #camera-container { position: relative; width: 100vw; height: 100vh; }
     video { width: 100%; height: 100%; object-fit: cover; }
+    video.mirror { transform: scaleX(-1); } /* Front camera mirror effect */
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
     
     /* Top Bar */
     .top-bar {
       position: absolute; top: 15px; left: 0; width: 100%;
-      display: flex; justify-content: center; z-index: 10;
+      display: flex; justify-content: center; align-items: center; gap: 10px; z-index: 10;
     }
     .status-pill {
       background: rgba(0,0,0,0.6); padding: 6px 14px;
       border-radius: 20px; font-size: 13px; border: 1px solid #444; backdrop-filter: blur(4px);
+      color: #fff;
     }
     .status-pill.aligned { border-color: #00ff66; color: #00ff66; font-weight: bold; }
+    .switch-btn { cursor: pointer; background: rgba(0,0,0,0.6); border: 1px solid #444; }
 
     /* Bottom Controls */
     .bottom-controls {
@@ -54,6 +57,7 @@
 
   <div class="top-bar">
     <div id="level-pill" class="status-pill">Level: Checking...</div>
+    <button id="switch-cam-btn" onclick="toggleCamera()" class="status-pill switch-btn">🔄 Switch</button>
   </div>
 
   <div class="bottom-controls">
@@ -80,18 +84,38 @@
 
   let currentMode = 'thirds';
   let isLevel = false;
+  let currentFacingMode = 'user'; // Pehle front open hoga, toggle se back
 
-  // 1. Camera Initialization
+  // 1. Camera Initialization with Switch Support
   async function startCamera() {
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: { 
+          facingMode: { ideal: currentFacingMode }, 
+          width: { ideal: 1920 }, 
+          height: { ideal: 1080 } 
+        },
         audio: false
       });
       video.srcObject = stream;
+
+      if (currentFacingMode === 'user') {
+        video.classList.add('mirror');
+      } else {
+        video.classList.remove('mirror');
+      }
     } catch (err) {
-      alert("कैमरा एक्सेस की अनुमति दें: " + err);
+      alert("Camera access error: " + err);
     }
+  }
+
+  function toggleCamera() {
+    currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+    startCamera();
   }
 
   // 2. Gyroscope Orientation Tracking
@@ -177,75 +201,69 @@
       ctx.stroke();
     },
 
-spiral: (ctx, w, h) => {
-  ctx.save();
-  
-  // स्क्रीन के केंद्र में Golden Ratio (1 : 1.618) का बाउंडिंग बॉक्स सेट करें
-  const PHI = 1.61803398875;
-  let boxW = w * 0.9;
-  let boxH = boxW / PHI;
-  if (boxH > h * 0.9) {
-    boxH = h * 0.9;
-    boxW = boxH * PHI;
-  }
+    spiral: (ctx, w, h) => {
+      ctx.save();
+      const PHI = 1.61803398875;
+      let boxW = w * 0.88;
+      let boxH = boxW / PHI;
+      if (boxH > h * 0.88) {
+        boxH = h * 0.88;
+        boxW = boxH * PHI;
+      }
 
-  let x = (w - boxW) / 2;
-  let y = (h - boxH) / 2;
-  let curW = boxW;
-  let curH = boxH;
+      let x = (w - boxW) / 2;
+      let y = (h - boxH) / 2;
+      let curW = boxW;
+      let curH = boxH;
 
-  // 1. सब-डिवाइडिंग गोल्डन रेक्टैंगल्स और स्पाइरल आर्क्स
-  // क्रम: Right, Bottom, Left, Top...
-  const iterations = 8;
-  const arcs = [];
+      const iterations = 8;
+      const arcs = [];
 
-  for (let i = 0; i < iterations; i++) {
-    ctx.strokeRect(x, y, curW, curH);
+      for (let i = 0; i < iterations; i++) {
+        ctx.strokeRect(x, y, curW, curH);
 
-    let squareSize, arcCenter, startAngle, endAngle;
-    const step = i % 4;
+        let squareSize, arcCenter, startAngle, endAngle;
+        const step = i % 4;
 
-    if (step === 0) { // बाएँ से वर्ग काटें
-      squareSize = curH;
-      arcCenter = { x: x + squareSize, y: y + squareSize };
-      startAngle = Math.PI;
-      endAngle = 1.5 * Math.PI;
-      x += squareSize;
-      curW -= squareSize;
-    } else if (step === 1) { // ऊपर से वर्ग काटें
-      squareSize = curW;
-      arcCenter = { x: x, y: y + squareSize };
-      startAngle = 1.5 * Math.PI;
-      endAngle = 2 * Math.PI;
-      y += squareSize;
-      curH -= squareSize;
-    } else if (step === 2) { // दाएँ से वर्ग काटें
-      squareSize = curH;
-      arcCenter = { x: x + curW - squareSize, y: y };
-      startAngle = 0;
-      endAngle = 0.5 * Math.PI;
-      curW -= squareSize;
-    } else if (step === 3) { // नीचे से वर्ग काटें
-      squareSize = curW;
-      arcCenter = { x: x + squareSize, y: y + curH - squareSize };
-      startAngle = 0.5 * Math.PI;
-      endAngle = Math.PI;
-      curH -= squareSize;
+        if (step === 0) {
+          squareSize = curH;
+          arcCenter = { x: x + squareSize, y: y + squareSize };
+          startAngle = Math.PI;
+          endAngle = 1.5 * Math.PI;
+          x += squareSize;
+          curW -= squareSize;
+        } else if (step === 1) {
+          squareSize = curW;
+          arcCenter = { x: x, y: y + squareSize };
+          startAngle = 1.5 * Math.PI;
+          endAngle = 2 * Math.PI;
+          y += squareSize;
+          curH -= squareSize;
+        } else if (step === 2) {
+          squareSize = curH;
+          arcCenter = { x: x + curW - squareSize, y: y };
+          startAngle = 0;
+          endAngle = 0.5 * Math.PI;
+          curW -= squareSize;
+        } else if (step === 3) {
+          squareSize = curW;
+          arcCenter = { x: x + squareSize, y: y + curH - squareSize };
+          startAngle = 0.5 * Math.PI;
+          endAngle = Math.PI;
+          curH -= squareSize;
+        }
+
+        arcs.push({ center: arcCenter, r: squareSize, start: startAngle, end: endAngle });
+      }
+
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      arcs.forEach(a => {
+        ctx.arc(a.center.x, a.center.y, a.r, a.start, a.end);
+      });
+      ctx.stroke();
+      ctx.restore();
     }
-
-    arcs.push({ center: arcCenter, r: squareSize, start: startAngle, end: endAngle });
-  }
-
-  // 2. स्मूथ स्पाइरल लाइन खींचें (थोड़ी बोल्ड)
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  arcs.forEach((a, idx) => {
-    ctx.arc(a.center.x, a.center.y, a.r, a.start, a.end);
-  });
-  ctx.stroke();
-
-  ctx.restore();
-}
   };
 
   // 4. Render Loop
@@ -257,7 +275,7 @@ spiral: (ctx, w, h) => {
 
     ctx.clearRect(0, 0, w, h);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = isLevel ? '#00ff66' : 'rgba(255, 255, 255, 0.4)';
+    ctx.strokeStyle = isLevel ? '#00ff66' : 'rgba(255, 255, 255, 0.45)';
 
     if (overlays[currentMode]) {
       overlays[currentMode](ctx, w, h, isLevel);
@@ -270,18 +288,23 @@ spiral: (ctx, w, h) => {
   function setMode(mode) {
     currentMode = mode;
     document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-    if (event && event.target) {
-      event.target.classList.add('active');
+    if (window.event && window.event.target) {
+      window.event.target.classList.add('active');
     }
   }
 
-  // 6. Snapshot Engine
+  // 6. Snapshot Engine with Front-Cam Mirror Support
   function takeSnapshot() {
     const snapCanvas = document.createElement('canvas');
     snapCanvas.width = video.videoWidth || 1920;
     snapCanvas.height = video.videoHeight || 1080;
     const snapCtx = snapCanvas.getContext('2d');
     
+    if (currentFacingMode === 'user') {
+      snapCtx.translate(snapCanvas.width, 0);
+      snapCtx.scale(-1, 1);
+    }
+
     snapCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
     
     const link = document.createElement('a');
