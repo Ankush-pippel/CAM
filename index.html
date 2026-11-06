@@ -177,12 +177,75 @@
       ctx.stroke();
     },
 
-    spiral: (ctx, w, h) => {
-      ctx.strokeRect(w * 0.1, h * 0.2, w * 0.8, h * 0.6);
-      ctx.beginPath();
-      ctx.arc(w * 0.6, h * 0.5, w * 0.2, 0, Math.PI);
-      ctx.stroke();
+spiral: (ctx, w, h) => {
+  ctx.save();
+  
+  // स्क्रीन के केंद्र में Golden Ratio (1 : 1.618) का बाउंडिंग बॉक्स सेट करें
+  const PHI = 1.61803398875;
+  let boxW = w * 0.9;
+  let boxH = boxW / PHI;
+  if (boxH > h * 0.9) {
+    boxH = h * 0.9;
+    boxW = boxH * PHI;
+  }
+
+  let x = (w - boxW) / 2;
+  let y = (h - boxH) / 2;
+  let curW = boxW;
+  let curH = boxH;
+
+  // 1. सब-डिवाइडिंग गोल्डन रेक्टैंगल्स और स्पाइरल आर्क्स
+  // क्रम: Right, Bottom, Left, Top...
+  const iterations = 8;
+  const arcs = [];
+
+  for (let i = 0; i < iterations; i++) {
+    ctx.strokeRect(x, y, curW, curH);
+
+    let squareSize, arcCenter, startAngle, endAngle;
+    const step = i % 4;
+
+    if (step === 0) { // बाएँ से वर्ग काटें
+      squareSize = curH;
+      arcCenter = { x: x + squareSize, y: y + squareSize };
+      startAngle = Math.PI;
+      endAngle = 1.5 * Math.PI;
+      x += squareSize;
+      curW -= squareSize;
+    } else if (step === 1) { // ऊपर से वर्ग काटें
+      squareSize = curW;
+      arcCenter = { x: x, y: y + squareSize };
+      startAngle = 1.5 * Math.PI;
+      endAngle = 2 * Math.PI;
+      y += squareSize;
+      curH -= squareSize;
+    } else if (step === 2) { // दाएँ से वर्ग काटें
+      squareSize = curH;
+      arcCenter = { x: x + curW - squareSize, y: y };
+      startAngle = 0;
+      endAngle = 0.5 * Math.PI;
+      curW -= squareSize;
+    } else if (step === 3) { // नीचे से वर्ग काटें
+      squareSize = curW;
+      arcCenter = { x: x + squareSize, y: y + curH - squareSize };
+      startAngle = 0.5 * Math.PI;
+      endAngle = Math.PI;
+      curH -= squareSize;
     }
+
+    arcs.push({ center: arcCenter, r: squareSize, start: startAngle, end: endAngle });
+  }
+
+  // 2. स्मूथ स्पाइरल लाइन खींचें (थोड़ी बोल्ड)
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  arcs.forEach((a, idx) => {
+    ctx.arc(a.center.x, a.center.y, a.r, a.start, a.end);
+  });
+  ctx.stroke();
+
+  ctx.restore();
+}
   };
 
   // 4. Render Loop
